@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Notes Widget</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <section id="login-view" hidden>
+        <h1>Notes Widget</h1>
+        <form id="login-form">
+          <input id="email" type="email" placeholder="E-posta" autocomplete="username" required />
+          <input
+            id="password"
+            type="password"
+            placeholder="Sifre"
+            autocomplete="current-password"
+            required
+          />
+          <div class="row">
+            <button id="signin-btn" type="submit">Giris Yap</button>
+            <button id="signup-btn" type="button">Kayit Ol</button>
+          </div>
+          <button id="google-btn" type="button" class="google">Google ile Giris Yap</button>
+          <p id="auth-error" class="error"></p>
+        </form>
+      </section>
+
+      <section id="notes-view" hidden>
+        <header>
+          <span id="user-email"></span>
+          <button id="signout-btn">Cikis Yap</button>
+        </header>
+        <form id="add-note-form">
+          <input id="note-text" type="text" placeholder="Yeni not..." required />
+          <button type="submit">Ekle</button>
+        </form>
+        <ul id="notes-list"></ul>
+      </section>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

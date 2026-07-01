@@ -1,0 +1,22 @@
+appId: com.notes-widget.app
+productName: Notes Widget
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+asarUnpack:
+  - '**/node_modules/koffi/**'
+extraResources:
+  - from: build/tray-icon.png
+    to: tray-icon.png
+win:
+  target: nsis
+  executableName: NotesWidget
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always

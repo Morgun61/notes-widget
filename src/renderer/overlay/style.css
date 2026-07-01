@@ -1,0 +1,59 @@
+html,
+body {
+  margin: 0;
+  background: transparent;
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#panel {
+  background: rgba(10, 10, 18, 0.8);
+  padding: 32px;
+  box-sizing: border-box;
+  width: 100vw;
+  height: 100vh;
+  color: #eee;
+  overflow-y: auto;
+}
+
+#panel h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #999;
+}
+
+#notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: calc(100vh - 88px);
+  column-count: 4;
+  column-fill: auto;
+  column-gap: 24px;
+}
+
+#notes-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  word-break: break-word;
+  break-inside: avoid;
+}
+
+#notes-list li.done {
+  text-decoration: line-through;
+  color: #888;
+}
+
+#notes-list li .pin {
+  color: #f5c542;
+  margin-right: 4px;
+}
+
+#notes-list li.empty {
+  color: #777;
+  font-size: 12px;
+  border-bottom: none;
+}

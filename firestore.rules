@@ -1,0 +1,91 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users/{userId}/notes/{noteId}
+// Fields:
+//   - text: string (required, 0-5000 chars) - the note content
+//   - done: boolean (required) - completion state
+//   - pinned: boolean (required) - pinned-to-top state
+//   - order: number (required) - manual sort key (fractional indexing)
+//   - createdAt: timestamp (required, immutable, must equal request.time on create)
+//   - updatedAt: timestamp (required, must equal request.time on every write)
+//
+// Ownership is enforced structurally via the {userId} path segment -
+// there is no separate ownerId/authorUID field on the note document.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // A note document is valid if it has exactly the allowed fields,
+    // all required fields are present, and every field has the correct
+    // type and stays within size/format constraints.
+    function isValidNote() {
+      let fields = ['text', 'done', 'pinned', 'order', 'createdAt', 'updatedAt'];
+      return hasOnlyAllowedFields(fields) &&
+        hasRequiredFields(fields) &&
+        validStringLength('text', 0, 5000) &&
+        request.resource.data.done is bool &&
+        request.resource.data.pinned is bool &&
+        request.resource.data.order is number &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        // updatedAt must be server-set to the current request time, never
+        // a client-supplied arbitrary timestamp.
+        request.resource.data.updatedAt == request.time;
+    }
+
+    match /users/{userId}/notes/{noteId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+        isValidNote() &&
+        // createdAt must be server-set on creation too.
+        request.resource.data.createdAt == request.time;
+
+      allow update: if isOwner(userId) &&
+        isValidNote() &&
+        areImmutableFieldsUnchanged(['createdAt']);
+
+      allow delete: if isOwner(userId);
+    }
+
+    // Default deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
