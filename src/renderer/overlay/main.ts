@@ -5,6 +5,7 @@ export {}
 interface OverlayBridgeApi {
   onAuthChanged: (callback: (state: AuthState) => void) => void
   onNotesChanged: (callback: (notes: Note[]) => void) => void
+  setInteractive: (interactive: boolean) => void
 }
 
 declare global {
@@ -13,7 +14,15 @@ declare global {
   }
 }
 
+const panelEl = document.getElementById('panel') as HTMLElement
 const listEl = document.getElementById('notes-list') as HTMLUListElement
+
+// The panel is sized to fit its content (see style.css), not the full
+// screen, so "mouse is over the panel" only covers the area where notes
+// are actually rendered - everywhere else on the desktop stays
+// click-through (see main/windows/overlayWindow.ts).
+panelEl.addEventListener('mouseenter', () => window.overlayBridge.setInteractive(true))
+panelEl.addEventListener('mouseleave', () => window.overlayBridge.setInteractive(false))
 
 function render(notes: Note[]): void {
   listEl.innerHTML = ''

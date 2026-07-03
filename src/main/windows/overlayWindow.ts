@@ -109,9 +109,11 @@ export function createOverlayWindow(): BrowserWindow {
     }
   })
 
-  // Read-only display panel - never intercepts clicks from the desktop
-  // or windows underneath it.
-  overlayWindow.setIgnoreMouseEvents(true)
+  // Click-through by default so desktop icons stay usable underneath -
+  // forward:true still lets the renderer see mouse-move/hover events so
+  // it can ask us (via ipc/handlers.ts) to disable this temporarily while
+  // the mouse is actually over the rendered notes panel.
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true })
 
   overlayWindow.once('ready-to-show', () => {
     overlayWindow?.show()

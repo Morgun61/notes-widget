@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { ipcMain } from 'electron'
-import { CommandChannels, DataEventChannels, InternalChannels } from '../../shared/ipc-channels'
+import { CommandChannels, DataEventChannels, InternalChannels, OverlayChannels } from '../../shared/ipc-channels'
 import type { AuthState } from '../../shared/types'
 import { getDataWindow } from '../windows/dataWindow'
 import { getMainWindow } from '../windows/mainWindow'
@@ -65,4 +65,19 @@ export function registerIpcHandlers(): void {
   for (const channel of Object.values(CommandChannels)) {
     ipcMain.handle(channel, (_event, payload) => relayToDataWindow(channel, payload))
   }
+
+  // The overlay is click-through by default (see overlayWindow.ts) so
+  // desktop icons stay clickable underneath it. The renderer asks us to
+  // temporarily disable that only while the mouse is actually over the
+  // rendered notes panel, so scrolling/interacting with it works without
+  // permanently blocking the rest of the desktop.
+  ipcMain.on(OverlayChannels.setInteractive, (_event, interactive: boolean) => {
+    const overlay = getOverlayWindow()
+    if (!overlay || overlay.isDestroyed()) return
+    if (interactive) {
+      overlay.setIgnoreMouseEvents(false)
+    } else {
+      overlay.setIgnoreMouseEvents(true, { forward: true })
+    }
+  })
 }

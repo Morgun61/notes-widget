@@ -18,3 +18,7 @@ export const InternalChannels = {
   dataCommand: 'data:command',
   dataCommandReply: 'data:commandReply'
 } as const
+
+export const OverlayChannels = {
+  setInteractive: 'overlay:setInteractive'
+} as const

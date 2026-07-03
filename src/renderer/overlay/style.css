@@ -7,13 +7,20 @@ body {
 }
 
 #panel {
+  /* Sized to fit its content (bounded by the screen), not stretched to
+     fill it - this is also the exact hit-test area that becomes
+     interactive on hover (see main.ts), so keeping it content-sized
+     means the rest of the desktop stays click-through. */
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
   background: rgba(10, 10, 18, 0.8);
   padding: 32px;
   box-sizing: border-box;
-  width: 100vw;
-  height: 100vh;
   color: #eee;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 #panel h2 {
@@ -28,7 +35,7 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  height: calc(100vh - 88px);
+  height: min(60vh, 480px);
   column-count: 4;
   column-fill: auto;
   column-gap: 24px;
