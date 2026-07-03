@@ -8,25 +8,28 @@ import { createDataWindow } from './windows/dataWindow'
 import { createMainWindow, getMainWindow } from './windows/mainWindow'
 import { createOverlayWindow } from './windows/overlayWindow'
 
-// The overlay is reparented into Progman/WorkerW to sit behind desktop
-// icons (see native/workerw.ts). Chromium's GPU-accelerated windows
-// present via a DirectComposition swap chain that DWM composites using
-// its own tracked Z-order, which SetParent/SetWindowLongW don't update -
-// so a hardware-accelerated overlay keeps rendering on top regardless of
-// its real place in the window tree. Falling back to software rendering
-// makes it obey normal Win32 Z-order again. This is app-wide since
-// Electron has no per-window toggle, but this app's UI is simple enough
-// that the perf cost is negligible.
-app.disableHardwareAcceleration()
+if (process.platform === 'win32') {
+  // The overlay is reparented into Progman/WorkerW (see native/workerw.ts).
+  // Chromium's GPU-accelerated windows present via a DirectComposition
+  // swap chain that DWM composites using its own tracked Z-order, which
+  // SetParent/SetWindowLongW don't update - so a hardware-accelerated
+  // overlay keeps rendering on top regardless of its real place in the
+  // window tree. Falling back to software rendering makes it obey normal
+  // Win32 Z-order again. This is app-wide since Electron has no
+  // per-window toggle, but this app's UI is simple enough that the perf
+  // cost is negligible. Windows-only: macOS/Linux don't reparent at all.
+  app.disableHardwareAcceleration()
 
-// Chromium's Native Window Occlusion tracker (Windows-only) watches each
-// window's on-screen rect and automatically stops rendering / hides
-// windows it thinks are occluded or off-screen. Once the overlay is
-// reparented behind the desktop icons it looks exactly like that to
-// Chromium, so it silently drops WS_VISIBLE - the window is still
-// "shown" from Electron's point of view but is invisible at the Win32
-// level. Must disable this before app.whenReady() creates any windows.
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+  // Chromium's Native Window Occlusion tracker (Windows-only feature, a
+  // no-op elsewhere) watches each window's on-screen rect and
+  // automatically stops rendering / hides windows it thinks are occluded
+  // or off-screen. Once the overlay is reparented it looks exactly like
+  // that to Chromium, so it silently drops WS_VISIBLE - the window is
+  // still "shown" from Electron's point of view but is invisible at the
+  // Win32 level. Must disable this before app.whenReady() creates any
+  // windows.
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+}
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 

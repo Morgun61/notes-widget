@@ -1,7 +1,14 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
 import { loadRendererPage } from '../loadRenderer'
-import { attachToDesktop, forceShowWindow, isWindowHandleValid } from '../native/workerw'
+
+// The Progman/WorkerW reparenting trick (native/workerw.ts) is Windows-only
+// Win32 API surface - koffi.load('user32.dll') runs as a module-level side
+// effect there, so even importing that module on macOS/Linux would throw
+// immediately. Load it lazily, and only on Windows.
+type WorkerWModule = typeof import('../native/workerw')
+let workerw: WorkerWModule | null = null
+const IS_WINDOWS = process.platform === 'win32'
 
 let overlayWindow: BrowserWindow | null = null
 let workerWHandle: unknown | null = null
@@ -30,7 +37,7 @@ function repositionOverlay(): void {
 }
 
 function tryEmbedBehindDesktop(): void {
-  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  if (!overlayWindow || overlayWindow.isDestroyed() || !workerw) return
 
   // Clear Chromium's own "always on top" intent through Electron's API
   // BEFORE reparenting. Chromium's HWNDMessageHandler actively re-asserts
@@ -41,7 +48,7 @@ function tryEmbedBehindDesktop(): void {
   // calls generate window position messages.
   overlayWindow.setAlwaysOnTop(false)
 
-  const handle = attachToDesktop(overlayWindow.getNativeWindowHandle())
+  const handle = workerw.attachToDesktop(overlayWindow.getNativeWindowHandle())
   if (handle) {
     workerWHandle = handle
     attachFailureCount = 0
@@ -52,19 +59,19 @@ function tryEmbedBehindDesktop(): void {
 }
 
 function startWatchdog(): void {
-  if (watchdogTimer) return
+  if (!IS_WINDOWS || watchdogTimer) return
 
   watchdogTimer = setInterval(() => {
-    if (!overlayWindow || overlayWindow.isDestroyed()) return
+    if (!overlayWindow || overlayWindow.isDestroyed() || !workerw) return
 
     // Electron's own show() races with our reparenting: it appears to
     // succeed immediately but Chromium's internal native show handling
     // finishes asynchronously afterward and can clear WS_VISIBLE again on
     // its own. Re-asserting on every tick means whenever that race loses,
     // it self-heals within one interval instead of staying invisible.
-    forceShowWindow(overlayWindow.getNativeWindowHandle())
+    workerw.forceShowWindow(overlayWindow.getNativeWindowHandle())
 
-    if (workerWHandle && isWindowHandleValid(workerWHandle)) return
+    if (workerWHandle && workerw.isWindowHandleValid(workerWHandle)) return
 
     // The WorkerW we attached to is gone (e.g. Explorer restarted) or we
     // never managed to attach yet - retry.
@@ -81,7 +88,20 @@ function startWatchdog(): void {
   }, WATCHDOG_INTERVAL_MS)
 }
 
-export function createOverlayWindow(): BrowserWindow {
+// macOS/Linux have no equivalent of Progman/WorkerW reparenting reachable
+// through Electron's public API - approximating "sits with the desktop"
+// there would need a native Swift/Objective-C window-level helper that
+// can't be built or verified without a real Mac. Instead, keep the panel
+// visible above normal windows and every Space/full-screen app, still
+// fully click-through - the closest equivalent achievable without native
+// platform code.
+function makeFloatingEverywhere(): void {
+  if (!overlayWindow) return
+  overlayWindow.setAlwaysOnTop(true, 'floating')
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+}
+
+export async function createOverlayWindow(): Promise<BrowserWindow> {
   const { x, y, width, height } = computeBounds()
 
   overlayWindow = new BrowserWindow({
@@ -93,10 +113,11 @@ export function createOverlayWindow(): BrowserWindow {
     resizable: false,
     movable: false,
     show: false,
-    // Not alwaysOnTop at creation: Chromium latches this as an internal
-    // flag it actively re-enforces (see tryEmbedBehindDesktop). Only the
-    // watchdog's give-up path turns it on, for the floating fallback case.
-    alwaysOnTop: false,
+    // Not alwaysOnTop at creation on Windows: Chromium latches this as an
+    // internal flag it actively re-enforces (see tryEmbedBehindDesktop).
+    // Only the watchdog's give-up path turns it on, for the floating
+    // fallback case. On mac/Linux we want it on top from the start.
+    alwaysOnTop: !IS_WINDOWS,
     skipTaskbar: true,
     transparent: true,
     hasShadow: false,
@@ -109,16 +130,26 @@ export function createOverlayWindow(): BrowserWindow {
     }
   })
 
-  // Always click-through, with no exceptions: the overlay now renders in
-  // front of the desktop icons and spans the whole screen, so any
-  // hover-triggered interactivity would capture clicks window-wide
-  // (not just over the hovered note) and could make icons unreachable
-  // wherever notes happen to be drawn. Read-only display only.
+  // Always click-through, with no exceptions: the overlay renders in
+  // front of the desktop icons (Windows) or every other window (mac/
+  // Linux) and spans the whole screen, so any hover-triggered
+  // interactivity would capture clicks window-wide, not just over the
+  // hovered note, and could make icons/windows underneath unreachable.
+  // Read-only display only.
   overlayWindow.setIgnoreMouseEvents(true)
+
+  if (IS_WINDOWS) {
+    workerw = await import('../native/workerw')
+  } else {
+    makeFloatingEverywhere()
+  }
 
   overlayWindow.once('ready-to-show', () => {
     overlayWindow?.show()
-    if (overlayWindow) forceShowWindow(overlayWindow.getNativeWindowHandle())
+
+    if (!IS_WINDOWS || !overlayWindow || !workerw) return
+
+    workerw.forceShowWindow(overlayWindow.getNativeWindowHandle())
 
     // Electron's native show handling finishes asynchronously and can
     // clear WS_VISIBLE shortly after our own call succeeds - reassert a
@@ -126,8 +157,8 @@ export function createOverlayWindow(): BrowserWindow {
     // for a full watchdog interval before self-healing.
     for (const delayMs of [300, 1000, 2000]) {
       setTimeout(() => {
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          forceShowWindow(overlayWindow.getNativeWindowHandle())
+        if (overlayWindow && !overlayWindow.isDestroyed() && workerw) {
+          workerw.forceShowWindow(overlayWindow.getNativeWindowHandle())
         }
       }, delayMs)
     }
@@ -139,8 +170,10 @@ export function createOverlayWindow(): BrowserWindow {
   screen.on('display-added', repositionOverlay)
   screen.on('display-removed', repositionOverlay)
 
-  tryEmbedBehindDesktop()
-  startWatchdog()
+  if (IS_WINDOWS) {
+    tryEmbedBehindDesktop()
+    startWatchdog()
+  }
 
   return overlayWindow
 }

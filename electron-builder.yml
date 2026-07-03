@@ -20,3 +20,12 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+mac:
+  target: dmg
+  category: public.app-category.productivity
+  # No Apple Developer ID certificate configured, so this stays
+  # unsigned/un-notarized - Gatekeeper will warn on first launch
+  # (right-click > Open, or System Settings > Privacy & Security >
+  # "Open Anyway"). Must be built on an actual Mac; electron-builder
+  # cannot produce a working signed/notarized mac build from Windows.
+  identity: null
