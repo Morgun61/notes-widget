@@ -71,14 +71,13 @@ const WS_EX_TOPMOST = 0x00000008
 const SWP_NOSIZE = 0x0001
 const SWP_NOMOVE = 0x0002
 const SWP_FRAMECHANGED = 0x0020
-// SetParent inserts the new child at the TOP of the parent's children,
-// which would put notes text in front of the desktop icons. We want the
-// opposite - icons stay visible, notes only show in empty desktop space -
-// so we explicitly drop the overlay to the bottom of the z-order right
-// after reparenting (still above the wallpaper, since the parent itself
-// sits above that in the global z-order).
-const HWND_BOTTOM = 1n
-const SWP_SEND_TO_BOTTOM = SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED
+// HWND_TOP: SetParent already inserts the new child at the top of the
+// parent's children by default, which is what puts the notes text in
+// front of the desktop icons - this call just re-asserts that
+// explicitly (and forces the frame-changed refresh) rather than relying
+// on it being left alone.
+const HWND_TOP = 0n
+const SWP_SEND_TO_TOP = SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED
 
 const EnumWindowsProc = koffi.proto('bool __stdcall EnumWindowsProc(void *hwnd, void *lparam)')
 const EnumWindows = user32.func('__stdcall', 'EnumWindows', 'bool', [
@@ -95,18 +94,13 @@ function getClassName(hwnd: unknown): string {
 }
 
 /**
- * Finds the WorkerW window that should host our overlay, following the
- * approach used by Rainmeter/Wallpaper-Engine-style tools:
- * ask Progman to spawn a WorkerW, then locate the top-level window that
- * hosts the desktop icons (SHELLDLL_DefView) and take its next WorkerW
- * sibling. On some Windows builds Progman hosts the icon view directly
- * and the blank WorkerW isn't a top-level sibling at all - it's nested
- * as a *child* of that same host window, right behind SHELLDLL_DefView
- * in the child z-order (confirmed by walking the child list with
- * EnumChildWindows: SHELLDLL_DefView appears first/frontmost, then a
- * plain WorkerW behind it). Check that child before giving up and
- * reparenting directly onto the icon host, which would render on top of
- * the icons instead of behind them.
+ * Finds the window our overlay should attach to so it renders in front
+ * of the desktop icons: the top-level window that actually hosts the
+ * icon view (SHELLDLL_DefView) - Progman itself on Windows builds that
+ * host the icon view directly, or a dedicated WorkerW on others.
+ * Reparenting as a child of that same host, at the top of its child
+ * z-order (the default SetParent position), puts our content directly
+ * above the icons instead of behind them.
  */
 function findWorkerW(): unknown | null {
   const progman = FindWindowW('Progman', null)
@@ -125,24 +119,14 @@ function findWorkerW(): unknown | null {
     return true
   }, null)
 
-  if (!defViewHost) return null
-
-  const sibling = FindWindowExW(null, defViewHost, 'WorkerW', null)
-  if (sibling) return sibling
-
-  const childWorkerW = FindWindowExW(defViewHost, null, 'WorkerW', null)
-  if (childWorkerW) return childWorkerW
-
-  // Fallback: this Windows build hosts SHELLDLL_DefView directly under
-  // Progman with no separate blank WorkerW at all (top-level or nested).
   return defViewHost
 }
 
 /**
  * Reparents an Electron BrowserWindow (given its native HWND buffer, from
- * `win.getNativeWindowHandle()`) behind the desktop icons. Returns the
- * WorkerW handle it attached to (to be re-validated later by a watchdog),
- * or null if no suitable target window could be found.
+ * `win.getNativeWindowHandle()`) onto the desktop, in front of the icons.
+ * Returns the host handle it attached to (to be re-validated later by a
+ * watchdog), or null if no suitable target window could be found.
  */
 export function attachToDesktop(hwndBuffer: Buffer): unknown | null {
   const hwnd = hwndBuffer.readBigUInt64LE(0)
@@ -164,7 +148,7 @@ export function attachToDesktop(hwndBuffer: Buffer): unknown | null {
   const exStyle = GetWindowLongW(hwnd, GWL_EXSTYLE)
   SetWindowLongW(hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_TOPMOST)
 
-  SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_SEND_TO_BOTTOM)
+  SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_SEND_TO_TOP)
 
   // Belt-and-braces: force the real WS_VISIBLE bit on ourselves instead
   // of trusting Electron's show() to have done it correctly for a window

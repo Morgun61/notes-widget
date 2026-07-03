@@ -9,19 +9,12 @@ const DataEventChannels = {
   notesChanged: 'data:notesChanged'
 } as const
 
-const OverlayChannels = {
-  setInteractive: 'overlay:setInteractive'
-} as const
-
 const api = {
   onAuthChanged: (callback: (state: AuthState) => void): void => {
     ipcRenderer.on(DataEventChannels.authChanged, (_event, state: AuthState) => callback(state))
   },
   onNotesChanged: (callback: (notes: Note[]) => void): void => {
     ipcRenderer.on(DataEventChannels.notesChanged, (_event, notes: Note[]) => callback(notes))
-  },
-  setInteractive: (interactive: boolean): void => {
-    ipcRenderer.send(OverlayChannels.setInteractive, interactive)
   }
 }
 

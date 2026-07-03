@@ -109,11 +109,12 @@ export function createOverlayWindow(): BrowserWindow {
     }
   })
 
-  // Click-through by default so desktop icons stay usable underneath -
-  // forward:true still lets the renderer see mouse-move/hover events so
-  // it can ask us (via ipc/handlers.ts) to disable this temporarily while
-  // the mouse is actually over the rendered notes panel.
-  overlayWindow.setIgnoreMouseEvents(true, { forward: true })
+  // Always click-through, with no exceptions: the overlay now renders in
+  // front of the desktop icons and spans the whole screen, so any
+  // hover-triggered interactivity would capture clicks window-wide
+  // (not just over the hovered note) and could make icons unreachable
+  // wherever notes happen to be drawn. Read-only display only.
+  overlayWindow.setIgnoreMouseEvents(true)
 
   overlayWindow.once('ready-to-show', () => {
     overlayWindow?.show()

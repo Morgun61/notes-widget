@@ -5,7 +5,6 @@ export {}
 interface OverlayBridgeApi {
   onAuthChanged: (callback: (state: AuthState) => void) => void
   onNotesChanged: (callback: (notes: Note[]) => void) => void
-  setInteractive: (interactive: boolean) => void
 }
 
 declare global {
@@ -16,23 +15,6 @@ declare global {
 
 const panelEl = document.getElementById('panel') as HTMLElement
 const listEl = document.getElementById('notes-list') as HTMLUListElement
-
-// The panel spans the whole screen (see style.css) so notes can be
-// scattered across the desktop, but most of that area is empty space
-// that should stay click-through for the icons underneath. Only turn on
-// interactivity while the mouse is actually over a rendered note line -
-// checked per mousemove rather than via CSS pointer-events, since the
-// container's own scrollbar (needed once interactive) would otherwise
-// be blocked too.
-let isOverlayInteractive = false
-
-document.addEventListener('mousemove', (event) => {
-  const overNote = Boolean((event.target as HTMLElement | null)?.closest('li'))
-  if (overNote !== isOverlayInteractive) {
-    isOverlayInteractive = overNote
-    window.overlayBridge.setInteractive(isOverlayInteractive)
-  }
-})
 
 const BASE_FONT_SIZE = 13
 const MIN_FONT_SIZE = 8
