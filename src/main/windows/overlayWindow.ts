@@ -1,7 +1,7 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
 import { loadRendererPage } from '../loadRenderer'
-import { attachToDesktop, isWindowHandleValid } from '../native/workerw'
+import { attachToDesktop, forceShowWindow, isWindowHandleValid } from '../native/workerw'
 
 let overlayWindow: BrowserWindow | null = null
 let workerWHandle: unknown | null = null
@@ -11,9 +11,17 @@ let attachFailureCount = 0
 const WATCHDOG_INTERVAL_MS = 5000
 const MAX_ATTACH_FAILURES = 5
 
+// Covers every connected display, not just the primary one - a monitor
+// plugged in later (or swapped for one with a different resolution) is
+// picked up automatically since this is recomputed on every
+// display-added/removed/metrics-changed event below.
 function computeBounds(): { x: number; y: number; width: number; height: number } {
-  const { bounds } = screen.getPrimaryDisplay()
-  return bounds
+  const displays = screen.getAllDisplays()
+  const left = Math.min(...displays.map((d) => d.bounds.x))
+  const top = Math.min(...displays.map((d) => d.bounds.y))
+  const right = Math.max(...displays.map((d) => d.bounds.x + d.bounds.width))
+  const bottom = Math.max(...displays.map((d) => d.bounds.y + d.bounds.height))
+  return { x: left, y: top, width: right - left, height: bottom - top }
 }
 
 function repositionOverlay(): void {
@@ -48,6 +56,13 @@ function startWatchdog(): void {
 
   watchdogTimer = setInterval(() => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return
+
+    // Electron's own show() races with our reparenting: it appears to
+    // succeed immediately but Chromium's internal native show handling
+    // finishes asynchronously afterward and can clear WS_VISIBLE again on
+    // its own. Re-asserting on every tick means whenever that race loses,
+    // it self-heals within one interval instead of staying invisible.
+    forceShowWindow(overlayWindow.getNativeWindowHandle())
 
     if (workerWHandle && isWindowHandleValid(workerWHandle)) return
 
@@ -97,6 +112,23 @@ export function createOverlayWindow(): BrowserWindow {
   // Read-only display panel - never intercepts clicks from the desktop
   // or windows underneath it.
   overlayWindow.setIgnoreMouseEvents(true)
+
+  overlayWindow.once('ready-to-show', () => {
+    overlayWindow?.show()
+    if (overlayWindow) forceShowWindow(overlayWindow.getNativeWindowHandle())
+
+    // Electron's native show handling finishes asynchronously and can
+    // clear WS_VISIBLE shortly after our own call succeeds - reassert a
+    // couple more times right away so the window doesn't sit invisible
+    // for a full watchdog interval before self-healing.
+    for (const delayMs of [300, 1000, 2000]) {
+      setTimeout(() => {
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          forceShowWindow(overlayWindow.getNativeWindowHandle())
+        }
+      }, delayMs)
+    }
+  })
 
   loadRendererPage(overlayWindow, 'overlay')
 

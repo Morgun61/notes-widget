@@ -54,19 +54,31 @@ const SetWindowPos = user32.func('__stdcall', 'SetWindowPos', 'bool', [
   'int',
   'uint32'
 ])
+// Electron's own BrowserWindow.show() doesn't reliably set WS_VISIBLE once
+// a window has already been reparented via raw SetParent - Chromium's
+// HWNDMessageHandler caches whether it thinks the window is top-level at
+// creation time and its Show() path gets confused for a window that's
+// become a WS_CHILD out from under it, so it updates its own internal
+// "is shown" bookkeeping without the OS-level style bit actually
+// following. Calling ShowWindow ourselves right after reparenting sets
+// the real bit regardless of what Electron's side thinks happened.
+const ShowWindow = user32.func('__stdcall', 'ShowWindow', 'bool', ['void *', 'int'])
+const SW_SHOWNA = 8
 const GWL_STYLE = -16
 const GWL_EXSTYLE = -20
 const WS_CHILD = 0x40000000
 const WS_EX_TOPMOST = 0x00000008
 const SWP_NOSIZE = 0x0001
 const SWP_NOMOVE = 0x0002
-const SWP_NOZORDER = 0x0004
 const SWP_FRAMECHANGED = 0x0020
-// No z-order change needed: SetParent already inserts the window at the
-// TOP of the new parent's children, which puts notes text in front of
-// the desktop icons (and still behind normal app windows, since the
-// parent itself - Progman/WorkerW - sits low in the global z-order).
-const SWP_REFRESH_ONLY = SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED
+// SetParent inserts the new child at the TOP of the parent's children,
+// which would put notes text in front of the desktop icons. We want the
+// opposite - icons stay visible, notes only show in empty desktop space -
+// so we explicitly drop the overlay to the bottom of the z-order right
+// after reparenting (still above the wallpaper, since the parent itself
+// sits above that in the global z-order).
+const HWND_BOTTOM = 1n
+const SWP_SEND_TO_BOTTOM = SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED
 
 const EnumWindowsProc = koffi.proto('bool __stdcall EnumWindowsProc(void *hwnd, void *lparam)')
 const EnumWindows = user32.func('__stdcall', 'EnumWindows', 'bool', [
@@ -87,9 +99,14 @@ function getClassName(hwnd: unknown): string {
  * approach used by Rainmeter/Wallpaper-Engine-style tools:
  * ask Progman to spawn a WorkerW, then locate the top-level window that
  * hosts the desktop icons (SHELLDLL_DefView) and take its next WorkerW
- * sibling. On Windows builds where Progman hosts the icon view directly
- * (no separate sibling WorkerW is created), fall back to reparenting onto
- * Progman itself - this is a documented quirk, not a bug in the search.
+ * sibling. On some Windows builds Progman hosts the icon view directly
+ * and the blank WorkerW isn't a top-level sibling at all - it's nested
+ * as a *child* of that same host window, right behind SHELLDLL_DefView
+ * in the child z-order (confirmed by walking the child list with
+ * EnumChildWindows: SHELLDLL_DefView appears first/frontmost, then a
+ * plain WorkerW behind it). Check that child before giving up and
+ * reparenting directly onto the icon host, which would render on top of
+ * the icons instead of behind them.
  */
 function findWorkerW(): unknown | null {
   const progman = FindWindowW('Progman', null)
@@ -113,8 +130,11 @@ function findWorkerW(): unknown | null {
   const sibling = FindWindowExW(null, defViewHost, 'WorkerW', null)
   if (sibling) return sibling
 
+  const childWorkerW = FindWindowExW(defViewHost, null, 'WorkerW', null)
+  if (childWorkerW) return childWorkerW
+
   // Fallback: this Windows build hosts SHELLDLL_DefView directly under
-  // Progman with no separate blank WorkerW sibling.
+  // Progman with no separate blank WorkerW at all (top-level or nested).
   return defViewHost
 }
 
@@ -144,13 +164,28 @@ export function attachToDesktop(hwndBuffer: Buffer): unknown | null {
   const exStyle = GetWindowLongW(hwnd, GWL_EXSTYLE)
   SetWindowLongW(hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_TOPMOST)
 
-  SetWindowPos(hwnd, null, 0, 0, 0, 0, SWP_REFRESH_ONLY)
+  SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_SEND_TO_BOTTOM)
+
+  // Belt-and-braces: force the real WS_VISIBLE bit on ourselves instead
+  // of trusting Electron's show() to have done it correctly for a window
+  // it no longer fully understands the ancestry of.
+  ShowWindow(hwnd, SW_SHOWNA)
 
   return workerW
 }
 
 export function isWindowHandleValid(handle: unknown): boolean {
   return Boolean(IsWindow(handle))
+}
+
+// Electron's BrowserWindow.show() runs its own internal ShowWindow call
+// which - for a window already reparented via raw SetParent - ends up
+// clearing WS_VISIBLE again instead of setting it (see attachToDesktop's
+// comment). Re-asserting it ourselves *after* show() has run, from the
+// caller's 'ready-to-show' handler, is what actually makes it stick.
+export function forceShowWindow(hwndBuffer: Buffer): void {
+  const hwnd = hwndBuffer.readBigUInt64LE(0)
+  ShowWindow(hwnd, SW_SHOWNA)
 }
 
 export function getActualParent(hwndBuffer: Buffer): { handle: unknown; className: string } | null {

@@ -19,6 +19,15 @@ import { createOverlayWindow } from './windows/overlayWindow'
 // that the perf cost is negligible.
 app.disableHardwareAcceleration()
 
+// Chromium's Native Window Occlusion tracker (Windows-only) watches each
+// window's on-screen rect and automatically stops rendering / hides
+// windows it thinks are occluded or off-screen. Once the overlay is
+// reparented behind the desktop icons it looks exactly like that to
+// Chromium, so it silently drops WS_VISIBLE - the window is still
+// "shown" from Electron's point of view but is invisible at the Win32
+// level. Must disable this before app.whenReady() creates any windows.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 
 if (!gotSingleInstanceLock) {
