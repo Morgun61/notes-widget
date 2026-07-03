@@ -68,8 +68,8 @@ export function registerIpcHandlers(): void {
 
   // The overlay is click-through by default (see overlayWindow.ts) so
   // desktop icons stay clickable underneath it. The renderer asks us to
-  // temporarily disable that only while the mouse is actually over the
-  // rendered notes panel, so scrolling/interacting with it works without
+  // temporarily disable that only while the mouse is actually over a
+  // rendered note line, so scrolling/interacting with it works without
   // permanently blocking the rest of the desktop.
   ipcMain.on(OverlayChannels.setInteractive, (_event, interactive: boolean) => {
     const overlay = getOverlayWindow()

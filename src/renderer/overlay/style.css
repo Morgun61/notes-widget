@@ -7,18 +7,11 @@ body {
 }
 
 #panel {
-  /* Sized to fit its content (bounded by the screen), not stretched to
-     fill it - this is also the exact hit-test area that becomes
-     interactive on hover (see main.ts), so keeping it content-sized
-     means the rest of the desktop stays click-through. */
-  position: fixed;
-  top: 24px;
-  left: 24px;
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 48px);
   background: rgba(10, 10, 18, 0.8);
   padding: 32px;
   box-sizing: border-box;
+  width: 100vw;
+  height: 100vh;
   color: #eee;
   overflow: auto;
 }
@@ -35,16 +28,16 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  height: min(60vh, 480px);
+  height: calc(100vh - 88px);
   column-count: 4;
   column-fill: auto;
   column-gap: 24px;
+  font-size: 13px;
 }
 
 #notes-list li {
   padding: 6px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 13px;
   word-break: break-word;
   break-inside: avoid;
 }

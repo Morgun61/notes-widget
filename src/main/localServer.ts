@@ -19,6 +19,13 @@ const MIME: Record<string, string> = {
 let server: Server | null = null
 let port = 0
 
+// Fixed rather than OS-assigned (port 0): Firebase Auth's persisted
+// session and Firestore's offline cache both live in IndexedDB, which is
+// scoped to the page's origin (protocol+host+port). A random port would
+// give every app launch a different origin, silently wiping that
+// persistence and forcing a fresh login each time.
+const FIXED_PORT = 51823
+
 export function startRendererServer(rootDir: string): Promise<number> {
   return new Promise((resolve, reject) => {
     server = createServer((req, res) => {
@@ -40,7 +47,7 @@ export function startRendererServer(rootDir: string): Promise<number> {
     })
 
     server.on('error', reject)
-    server.listen(0, '127.0.0.1', () => {
+    server.listen(FIXED_PORT, '127.0.0.1', () => {
       const address = server?.address()
       port = typeof address === 'object' && address ? address.port : 0
       resolve(port)
