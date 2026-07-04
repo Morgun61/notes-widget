@@ -42,8 +42,22 @@ const notesList = document.getElementById('notes-list') as HTMLUListElement
 
 let currentNotes: Note[] = []
 
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  'auth/invalid-credential': 'E-posta veya sifre hatali.',
+  'auth/invalid-email': 'Gecersiz e-posta adresi.',
+  'auth/user-not-found': 'Bu e-posta ile kayitli bir hesap bulunamadi.',
+  'auth/wrong-password': 'E-posta veya sifre hatali.',
+  'auth/email-already-in-use': 'Bu e-posta adresi zaten kullaniliyor.',
+  'auth/weak-password': 'Sifre cok zayif, en az 6 karakter olmali.',
+  'auth/too-many-requests': 'Cok fazla deneme yapildi, lutfen daha sonra tekrar deneyin.',
+  'auth/network-request-failed': 'Aginiza baglanilamadi, internet baglantinizi kontrol edin.',
+  'auth/popup-closed-by-user': 'Google giris penceresi kapatildi.'
+}
+
 function showError(err: unknown): void {
-  authError.textContent = err instanceof Error ? err.message : String(err)
+  const raw = err instanceof Error ? err.message : String(err)
+  const code = raw.match(/auth\/[a-z0-9-]+/)?.[0]
+  authError.textContent = (code && AUTH_ERROR_MESSAGES[code]) ?? 'Bir hata olustu, lutfen tekrar deneyin.'
 }
 
 loginForm.addEventListener('submit', (event) => {
