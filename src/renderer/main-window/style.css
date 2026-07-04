@@ -103,6 +103,10 @@ header {
   margin-bottom: 0;
 }
 
+#search-input {
+  margin-bottom: 8px;
+}
+
 #notes-list {
   list-style: none;
   margin: 0;
@@ -118,6 +122,25 @@ header {
   gap: 8px;
   padding: 6px 0;
   border-bottom: 1px solid #333;
+}
+
+#notes-list li[draggable='true'] {
+  cursor: grab;
+}
+
+#notes-list li.dragging {
+  opacity: 0.4;
+}
+
+#notes-list li.drag-over {
+  border-top: 2px solid #4f6df5;
+}
+
+#notes-list li.empty {
+  color: #777;
+  justify-content: center;
+  border-bottom: none;
+  cursor: default;
 }
 
 #notes-list li.done span.text {

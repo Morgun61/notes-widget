@@ -38,9 +38,12 @@ const userEmailEl = document.getElementById('user-email') as HTMLElement
 const signoutBtn = document.getElementById('signout-btn') as HTMLButtonElement
 const addNoteForm = document.getElementById('add-note-form') as HTMLFormElement
 const noteTextInput = document.getElementById('note-text') as HTMLInputElement
+const searchInput = document.getElementById('search-input') as HTMLInputElement
 const notesList = document.getElementById('notes-list') as HTMLUListElement
 
 let currentNotes: Note[] = []
+let searchQuery = ''
+let draggedNoteId: string | null = null
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'auth/invalid-credential': 'E-posta veya sifre hatali.',
@@ -98,13 +101,50 @@ addNoteForm.addEventListener('submit', (event) => {
     .catch(showError)
 })
 
-function renderNotes(notes: Note[]): void {
-  currentNotes = notes
+// Drag-and-drop reordering writes back `order` values computed from the
+// displayed array's index. That's only safe to do against the full,
+// unfiltered note list - if a search filter hid some notes, the visible
+// index would clobber their relative order too. So dragging is only wired
+// up (draggable="true" + a droppable notesList) when the search box is
+// empty and `notes` here is exactly `currentNotes`.
+function renderList(notes: Note[], reorderable: boolean): void {
   notesList.innerHTML = ''
+
+  if (notes.length === 0 && searchQuery.trim()) {
+    const empty = document.createElement('li')
+    empty.className = 'empty'
+    empty.textContent = 'Sonuc bulunamadi'
+    notesList.append(empty)
+    return
+  }
 
   for (const note of notes) {
     const li = document.createElement('li')
     if (note.done) li.classList.add('done')
+    li.draggable = reorderable
+
+    li.addEventListener('dragstart', () => {
+      draggedNoteId = note.id
+      li.classList.add('dragging')
+    })
+    li.addEventListener('dragend', () => {
+      draggedNoteId = null
+      li.classList.remove('dragging')
+    })
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault()
+    })
+    li.addEventListener('dragenter', () => {
+      if (draggedNoteId && draggedNoteId !== note.id) li.classList.add('drag-over')
+    })
+    li.addEventListener('dragleave', () => {
+      li.classList.remove('drag-over')
+    })
+    li.addEventListener('drop', (e) => {
+      e.preventDefault()
+      li.classList.remove('drag-over')
+      reorderNotes(draggedNoteId, note.id)
+    })
 
     const checkbox = document.createElement('input')
     checkbox.type = 'checkbox'
@@ -154,6 +194,40 @@ function renderNotes(notes: Note[]): void {
   }
 }
 
+function reorderNotes(draggedId: string | null, targetId: string): void {
+  if (!draggedId || draggedId === targetId) return
+
+  const reordered = [...currentNotes]
+  const fromIndex = reordered.findIndex((n) => n.id === draggedId)
+  const toIndex = reordered.findIndex((n) => n.id === targetId)
+  if (fromIndex === -1 || toIndex === -1) return
+
+  const [moved] = reordered.splice(fromIndex, 1)
+  reordered.splice(toIndex, 0, moved)
+
+  reordered.forEach((note, index) => {
+    if (note.order !== index) {
+      window.notesWidget.notes.update(note.id, { order: index }).catch(showError)
+    }
+  })
+}
+
+function applyFilterAndRender(): void {
+  const q = searchQuery.trim().toLowerCase()
+  const filtered = q ? currentNotes.filter((n) => n.text.toLowerCase().includes(q)) : currentNotes
+  renderList(filtered, q === '')
+}
+
+function renderNotes(notes: Note[]): void {
+  currentNotes = notes
+  applyFilterAndRender()
+}
+
+searchInput.addEventListener('input', () => {
+  searchQuery = searchInput.value
+  applyFilterAndRender()
+})
+
 window.notesWidget.auth.onChanged((state) => {
   authError.textContent = ''
   if (state.status === 'signedIn') {
@@ -164,6 +238,8 @@ window.notesWidget.auth.onChanged((state) => {
   } else {
     loginView.hidden = false
     notesView.hidden = true
+    searchQuery = ''
+    searchInput.value = ''
     renderNotes([])
   }
 })
