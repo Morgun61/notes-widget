@@ -79,9 +79,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(CommandChannels.authSignOut, async (_event, payload) => {
     const result = await relayToDataWindow(CommandChannels.authSignOut, payload)
     await session.defaultSession.clearStorageData()
-    getDataWindow()?.webContents.reload()
-    getMainWindow()?.webContents.reload()
-    getOverlayWindow()?.webContents.reload()
+    // Deferred to the next tick: this handler's reply still has to reach
+    // the invoking renderer (mainWindow itself, most of the time). Reloading
+    // mainWindow's webContents in the same tick raced with delivery of that
+    // reply, sometimes tearing the page down mid-navigation and leaving it
+    // in an inconsistent state (stale content, or storage clearing skipped).
+    setImmediate(() => {
+      getDataWindow()?.webContents.reload()
+      getMainWindow()?.webContents.reload()
+      getOverlayWindow()?.webContents.reload()
+    })
     return result
   })
 
