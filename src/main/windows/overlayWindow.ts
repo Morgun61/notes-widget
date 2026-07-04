@@ -10,6 +10,13 @@ type WorkerWModule = typeof import('../native/workerw')
 let workerw: WorkerWModule | null = null
 const IS_WINDOWS = process.platform === 'win32'
 
+// Same lazy-load reasoning as workerw above, but for the libobjc/
+// CoreGraphics FFI calls in native/nswindow.ts - only ever safe to
+// import on macOS.
+type NsWindowModule = typeof import('../native/nswindow')
+let nswindow: NsWindowModule | null = null
+const IS_MAC = process.platform === 'darwin'
+
 let overlayWindow: BrowserWindow | null = null
 let workerWHandle: unknown | null = null
 let watchdogTimer: NodeJS.Timeout | null = null
@@ -97,19 +104,23 @@ function startWatchdog(): void {
   }, WATCHDOG_INTERVAL_MS)
 }
 
-// macOS/Linux have no equivalent of Progman/WorkerW reparenting reachable
-// through Electron's public API - there's no way to explicitly attach
-// behind desktop icons like on Windows. But the window never takes focus
-// (focusable: false, click-through), so leaving it at the OS's default
-// "normal" window level - the same tier regular app windows sit at,
-// rather than forcing 'floating' above everything - is enough: the
-// window server raises whatever app the user actually activates above a
-// same-level window that's never itself activated, while Finder's
-// desktop (icons/wallpaper), a level below "normal", still stays under
-// it. Only visibleOnAllWorkspaces is still needed so switching Spaces
-// doesn't leave the panel behind.
+// visibleOnAllWorkspaces alone (no window-level change) is the fallback
+// for platforms with no native hook to pin the window below normal
+// app windows - currently just Linux, where there's no equivalent of
+// either the Windows WorkerW trick or the mac NSWindow-level one below.
 function keepVisibleAcrossSpaces(): void {
   if (!overlayWindow) return
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+}
+
+// mac has no Progman/WorkerW-style reparenting API either, but unlike
+// Linux it does let us set a window's raw NSWindow level directly
+// (native/nswindow.ts) - the actual fix, after plain
+// alwaysOnTop:false/'normal' turned out to still leave the panel on top
+// of whatever app window wasn't most-recently activated.
+function pinOverlayAboveDesktopIcons(): void {
+  if (!overlayWindow || overlayWindow.isDestroyed() || !nswindow) return
+  nswindow.pinAboveDesktopIcons(overlayWindow.getNativeWindowHandle())
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 }
 
@@ -153,12 +164,19 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
 
   if (IS_WINDOWS) {
     workerw = await import('../native/workerw')
+  } else if (IS_MAC) {
+    nswindow = await import('../native/nswindow')
   } else {
     keepVisibleAcrossSpaces()
   }
 
   overlayWindow.once('ready-to-show', () => {
     overlayWindow?.show()
+
+    if (IS_MAC) {
+      pinOverlayAboveDesktopIcons()
+      return
+    }
 
     if (!IS_WINDOWS || !overlayWindow || !workerw) return
 
@@ -200,6 +218,11 @@ export function showOverlayWindow(): void {
   overlayWindow?.showInactive()
   if (IS_WINDOWS && overlayWindow && workerw) {
     workerw.forceShowWindow(overlayWindow.getNativeWindowHandle())
+  } else if (IS_MAC) {
+    // showInactive() re-orders the window through Cocoa's normal show
+    // path, which can reset the level we pinned at creation - reassert
+    // it every time the overlay comes back (e.g. after sign-in).
+    pinOverlayAboveDesktopIcons()
   }
 }
 
