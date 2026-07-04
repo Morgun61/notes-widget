@@ -62,22 +62,16 @@ export function registerIpcHandlers(): void {
     getOverlayWindow()?.webContents.send(channel, payload)
   })
 
-  // Signing out of Firebase doesn't touch the Google account cookies left
-  // behind by the sign-in popup - without clearing them, the next "Sign in
-  // with Google" silently re-authenticates as the same account instead of
-  // asking for credentials again.
+  // Signing out of Firebase doesn't touch the Google account session left
+  // behind by the sign-in popup. That session isn't reliably confined to a
+  // single cookie domain (accounts.google.com, google.com, etc. all hold
+  // pieces of it, and it varies by region), so a domain-scoped cookie clear
+  // still let "Sign in with Google" silently reuse the old session on some
+  // platforms. A full session wipe is the only reliable fix - nothing else
+  // in the app depends on Chromium-session-level storage surviving sign-out.
   ipcMain.handle(CommandChannels.authSignOut, async (_event, payload) => {
     const result = await relayToDataWindow(CommandChannels.authSignOut, payload)
-    const googleCookies = await session.defaultSession.cookies.get({ domain: 'google.com' })
-    await Promise.all(
-      googleCookies.map((cookie) =>
-        session.defaultSession.cookies.remove(
-          `https://${(cookie.domain ?? 'google.com').replace(/^\./, '')}${cookie.path ?? '/'}`,
-          cookie.name
-        )
-      )
-    )
-    await session.defaultSession.clearStorageData({ origin: 'https://accounts.google.com' })
+    await session.defaultSession.clearStorageData()
     return result
   })
 
