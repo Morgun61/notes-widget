@@ -98,15 +98,18 @@ function startWatchdog(): void {
 }
 
 // macOS/Linux have no equivalent of Progman/WorkerW reparenting reachable
-// through Electron's public API - approximating "sits with the desktop"
-// there would need a native Swift/Objective-C window-level helper that
-// can't be built or verified without a real Mac. Instead, keep the panel
-// visible above normal windows and every Space/full-screen app, still
-// fully click-through - the closest equivalent achievable without native
-// platform code.
-function makeFloatingEverywhere(): void {
+// through Electron's public API - there's no way to explicitly attach
+// behind desktop icons like on Windows. But the window never takes focus
+// (focusable: false, click-through), so leaving it at the OS's default
+// "normal" window level - the same tier regular app windows sit at,
+// rather than forcing 'floating' above everything - is enough: the
+// window server raises whatever app the user actually activates above a
+// same-level window that's never itself activated, while Finder's
+// desktop (icons/wallpaper), a level below "normal", still stays under
+// it. Only visibleOnAllWorkspaces is still needed so switching Spaces
+// doesn't leave the panel behind.
+function keepVisibleAcrossSpaces(): void {
   if (!overlayWindow) return
-  overlayWindow.setAlwaysOnTop(true, 'floating')
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 }
 
@@ -125,8 +128,9 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
     // Not alwaysOnTop at creation on Windows: Chromium latches this as an
     // internal flag it actively re-enforces (see tryEmbedBehindDesktop).
     // Only the watchdog's give-up path turns it on, for the floating
-    // fallback case. On mac/Linux we want it on top from the start.
-    alwaysOnTop: !IS_WINDOWS,
+    // fallback case. mac/Linux never need it either now - see
+    // keepVisibleAcrossSpaces.
+    alwaysOnTop: false,
     skipTaskbar: true,
     transparent: true,
     hasShadow: false,
@@ -150,7 +154,7 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
   if (IS_WINDOWS) {
     workerw = await import('../native/workerw')
   } else {
-    makeFloatingEverywhere()
+    keepVisibleAcrossSpaces()
   }
 
   overlayWindow.once('ready-to-show', () => {
