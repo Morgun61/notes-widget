@@ -64,6 +64,7 @@ function render(notes: Note[]): void {
   for (const note of notes) {
     const li = document.createElement('li')
     if (note.done) li.classList.add('done')
+    li.style.borderLeftColor = note.color || 'transparent'
     if (note.pinned) {
       const pin = document.createElement('span')
       pin.className = 'pin'

@@ -34,7 +34,10 @@ const api = {
   notes: {
     add: (text: string, order: number): Promise<void> =>
       ipcRenderer.invoke(CommandChannels.notesAdd, { text, order }),
-    update: (id: string, fields: Partial<Pick<Note, 'text' | 'done' | 'pinned' | 'order'>>): Promise<void> =>
+    update: (
+      id: string,
+      fields: Partial<Pick<Note, 'text' | 'done' | 'pinned' | 'order' | 'color'>>
+    ): Promise<void> =>
       ipcRenderer.invoke(CommandChannels.notesUpdate, { id, ...fields }),
     delete: (id: string): Promise<void> => ipcRenderer.invoke(CommandChannels.notesDelete, { id }),
     onChanged: (callback: (notes: Note[]) => void): void => {

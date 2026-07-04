@@ -4,6 +4,7 @@ export interface Note {
   done: boolean
   pinned: boolean
   order: number
+  color: string
   createdAt: number
   updatedAt: number
 }

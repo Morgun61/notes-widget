@@ -65,6 +65,7 @@ function toNote(id: string, data: Record<string, unknown>): Note {
     done: Boolean(data.done),
     pinned: Boolean(data.pinned),
     order: Number(data.order ?? 0),
+    color: String(data.color ?? ''),
     createdAt: toMillis(data.createdAt),
     updatedAt: toMillis(data.updatedAt)
   }
@@ -158,6 +159,7 @@ window.dataBridge.onCommand(async (channel, payload) => {
         done: false,
         pinned: false,
         order,
+        color: '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       })
@@ -165,7 +167,7 @@ window.dataBridge.onCommand(async (channel, payload) => {
     }
     case CommandChannels.notesUpdate: {
       const { id, ...fields } = payload as { id: string } & Partial<
-        Pick<Note, 'text' | 'done' | 'pinned' | 'order'>
+        Pick<Note, 'text' | 'done' | 'pinned' | 'order' | 'color'>
       >
       await updateDoc(doc(db, 'users', requireUid(), 'notes', id), {
         ...fields,

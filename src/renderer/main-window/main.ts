@@ -12,7 +12,10 @@ interface NotesWidgetApi {
   }
   notes: {
     add: (text: string, order: number) => Promise<void>
-    update: (id: string, fields: Partial<Pick<Note, 'text' | 'done' | 'pinned' | 'order'>>) => Promise<void>
+    update: (
+      id: string,
+      fields: Partial<Pick<Note, 'text' | 'done' | 'pinned' | 'order' | 'color'>>
+    ) => Promise<void>
     delete: (id: string) => Promise<void>
     onChanged: (callback: (notes: Note[]) => void) => void
   }
@@ -44,6 +47,66 @@ const notesList = document.getElementById('notes-list') as HTMLUListElement
 let currentNotes: Note[] = []
 let searchQuery = ''
 let draggedNoteId: string | null = null
+
+const COLOR_PALETTE = [
+  '#ff6b6b',
+  '#f5a442',
+  '#f5c542',
+  '#4caf82',
+  '#4f6df5',
+  '#9b6df5',
+  '#f56dab'
+]
+
+let colorPopover: HTMLDivElement | null = null
+
+function closeColorPopover(): void {
+  colorPopover?.remove()
+  colorPopover = null
+}
+
+function openColorPopover(anchor: HTMLElement, note: Note): void {
+  closeColorPopover()
+
+  const popover = document.createElement('div')
+  popover.className = 'color-popover'
+
+  const noneBtn = document.createElement('button')
+  noneBtn.type = 'button'
+  noneBtn.className = 'color-option none'
+  noneBtn.title = 'Renksiz'
+  noneBtn.addEventListener('click', () => {
+    window.notesWidget.notes.update(note.id, { color: '' }).catch(showError)
+    closeColorPopover()
+  })
+  popover.append(noneBtn)
+
+  for (const color of COLOR_PALETTE) {
+    const optBtn = document.createElement('button')
+    optBtn.type = 'button'
+    optBtn.className = 'color-option'
+    optBtn.style.background = color
+    optBtn.addEventListener('click', () => {
+      window.notesWidget.notes.update(note.id, { color }).catch(showError)
+      closeColorPopover()
+    })
+    popover.append(optBtn)
+  }
+
+  const rect = anchor.getBoundingClientRect()
+  popover.style.top = `${rect.bottom + 4}px`
+  popover.style.left = `${rect.left}px`
+
+  document.body.append(popover)
+  colorPopover = popover
+
+  // The click that opened this popover is still bubbling up to
+  // document when this handler is attached synchronously - deferring
+  // by a tick keeps that same click from immediately closing it back.
+  setTimeout(() => {
+    document.addEventListener('click', closeColorPopover, { once: true })
+  }, 0)
+}
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'auth/invalid-credential': 'E-posta veya sifre hatali.',
@@ -122,6 +185,7 @@ function renderList(notes: Note[], reorderable: boolean): void {
     const li = document.createElement('li')
     if (note.done) li.classList.add('done')
     li.draggable = reorderable
+    li.style.borderLeftColor = note.color || 'transparent'
 
     li.addEventListener('dragstart', () => {
       draggedNoteId = note.id
@@ -174,6 +238,16 @@ function renderList(notes: Note[], reorderable: boolean): void {
       })
     })
 
+    const colorBtn = document.createElement('button')
+    colorBtn.type = 'button'
+    colorBtn.className = 'color-swatch'
+    colorBtn.title = 'Renk sec'
+    colorBtn.style.background = note.color || 'transparent'
+    colorBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      openColorPopover(colorBtn, note)
+    })
+
     const pinBtn = document.createElement('button')
     pinBtn.textContent = note.pinned ? '★ PIN' : 'PIN'
     pinBtn.type = 'button'
@@ -189,7 +263,7 @@ function renderList(notes: Note[], reorderable: boolean): void {
       window.notesWidget.notes.delete(note.id).catch(showError)
     })
 
-    li.append(checkbox, textSpan, pinBtn, deleteBtn)
+    li.append(checkbox, colorBtn, textSpan, pinBtn, deleteBtn)
     notesList.append(li)
   }
 }
