@@ -114,7 +114,7 @@ function renderNotes(notes: Note[]): void {
     })
 
     const pinBtn = document.createElement('button')
-    pinBtn.textContent = 'PIN'
+    pinBtn.textContent = note.pinned ? '★ PIN' : 'PIN'
     pinBtn.type = 'button'
     if (note.pinned) pinBtn.classList.add('pin-active')
     pinBtn.addEventListener('click', () => {

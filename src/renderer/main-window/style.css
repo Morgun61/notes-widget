@@ -108,5 +108,6 @@ header {
 }
 
 #notes-list li button.pin-active {
-  color: #f5c542;
+  background: #f5c542;
+  color: #1e1e2e;
 }
