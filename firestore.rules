@@ -10,6 +10,7 @@ rules_version = '2';
 //   - done: boolean (required) - completion state
 //   - pinned: boolean (required) - pinned-to-top state
 //   - order: number (required) - manual sort key (fractional indexing)
+//   - color: string (required, 0-20 chars) - hex color code, or '' for none
 //   - createdAt: timestamp (required, immutable, must equal request.time on create)
 //   - updatedAt: timestamp (required, must equal request.time on every write)
 //
@@ -54,10 +55,11 @@ service cloud.firestore {
     // all required fields are present, and every field has the correct
     // type and stays within size/format constraints.
     function isValidNote() {
-      let fields = ['text', 'done', 'pinned', 'order', 'createdAt', 'updatedAt'];
+      let fields = ['text', 'done', 'pinned', 'order', 'color', 'createdAt', 'updatedAt'];
       return hasOnlyAllowedFields(fields) &&
         hasRequiredFields(fields) &&
         validStringLength('text', 0, 5000) &&
+        validStringLength('color', 0, 20) &&
         request.resource.data.done is bool &&
         request.resource.data.pinned is bool &&
         request.resource.data.order is number &&
