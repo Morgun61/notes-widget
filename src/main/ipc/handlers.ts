@@ -4,7 +4,7 @@ import { CommandChannels, DataEventChannels, InternalChannels } from '../../shar
 import type { AuthState } from '../../shared/types'
 import { getDataWindow } from '../windows/dataWindow'
 import { getMainWindow } from '../windows/mainWindow'
-import { getOverlayWindow } from '../windows/overlayWindow'
+import { getOverlayWindow, hideOverlayWindow, showOverlayWindow } from '../windows/overlayWindow'
 import { updateTrayAuthState } from '../tray'
 
 interface PendingRequest {
@@ -51,11 +51,10 @@ export function registerIpcHandlers(): void {
     if (channel === DataEventChannels.authChanged) {
       const state = payload as AuthState
       updateTrayAuthState(state)
-      const overlay = getOverlayWindow()
       if (state.status === 'signedIn') {
-        overlay?.showInactive()
+        showOverlayWindow()
       } else {
-        overlay?.hide()
+        hideOverlayWindow()
       }
     }
     getMainWindow()?.webContents.send(channel, payload)

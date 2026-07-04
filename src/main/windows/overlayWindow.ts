@@ -15,6 +15,14 @@ let workerWHandle: unknown | null = null
 let watchdogTimer: NodeJS.Timeout | null = null
 let attachFailureCount = 0
 
+// The watchdog below exists to force the overlay back on screen whenever
+// Chromium/Windows hides it behind our back. That same logic would just as
+// happily undo an intentional hideOverlayWindow() call (e.g. on sign-out)
+// within one watchdog tick, since forceShowWindow doesn't know the
+// difference between "hidden by accident" and "hidden on purpose". This
+// flag is what tells it to stand down.
+let desiredVisible = true
+
 const WATCHDOG_INTERVAL_MS = 5000
 const MAX_ATTACH_FAILURES = 5
 
@@ -63,6 +71,7 @@ function startWatchdog(): void {
 
   watchdogTimer = setInterval(() => {
     if (!overlayWindow || overlayWindow.isDestroyed() || !workerw) return
+    if (!desiredVisible) return
 
     // Electron's own show() races with our reparenting: it appears to
     // succeed immediately but Chromium's internal native show handling
@@ -180,4 +189,17 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
 
 export function getOverlayWindow(): BrowserWindow | null {
   return overlayWindow
+}
+
+export function showOverlayWindow(): void {
+  desiredVisible = true
+  overlayWindow?.showInactive()
+  if (IS_WINDOWS && overlayWindow && workerw) {
+    workerw.forceShowWindow(overlayWindow.getNativeWindowHandle())
+  }
+}
+
+export function hideOverlayWindow(): void {
+  desiredVisible = false
+  overlayWindow?.hide()
 }
