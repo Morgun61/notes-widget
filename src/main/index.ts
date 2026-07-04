@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { appState } from './appState'
+import { initAutoUpdate } from './autoUpdate'
 import { registerIpcHandlers } from './ipc/handlers'
 import { startRendererServer } from './localServer'
 import { createTray } from './tray'
@@ -58,6 +59,7 @@ if (!gotSingleInstanceLock) {
     createMainWindow()
     createOverlayWindow()
     createTray()
+    initAutoUpdate()
   })
 
   app.on('before-quit', () => {

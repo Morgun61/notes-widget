@@ -2,6 +2,10 @@ appId: com.notes-widget.app
 productName: Notes Widget
 directories:
   buildResources: build
+publish:
+  provider: github
+  owner: Morgun61
+  repo: notes-widget
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -21,11 +25,18 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
-  target: dmg
+  # zip alongside dmg: Squirrel.Mac (electron-updater's mac auto-update
+  # engine) fetches a zipped .app bundle to install in place, not the
+  # dmg itself - dmg stays here only for the initial manual download/install.
+  target:
+    - dmg
+    - zip
   category: public.app-category.productivity
   # No Apple Developer ID certificate configured, so this stays
   # unsigned/un-notarized - Gatekeeper will warn on first launch
   # (right-click > Open, or System Settings > Privacy & Security >
   # "Open Anyway"). Must be built on an actual Mac; electron-builder
   # cannot produce a working signed/notarized mac build from Windows.
+  # Auto-update also silently won't work while unsigned - Squirrel.Mac
+  # requires a signed app to apply updates.
   identity: null
