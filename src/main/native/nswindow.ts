@@ -43,10 +43,19 @@ const selSetLevel = sel_registerName('setLevel:')
  * - an NSView*, not an NSWindow*, on macOS.
  */
 export function pinAboveDesktopIcons(nsViewHandle: Buffer): void {
-  const nsView = nsViewHandle.readBigUInt64LE(0)
-  const nsWindow = msgSendGet(nsView, selWindow)
-  if (!nsWindow) return
+  try {
+    const nsView = nsViewHandle.readBigUInt64LE(0)
+    const nsWindow = msgSendGet(nsView, selWindow)
+    if (!nsWindow) {
+      console.log('[nswindow] [nsView window] returned null, nsView =', nsView)
+      return
+    }
 
-  const desktopIconLevel = CGWindowLevelForKey(kCGDesktopIconWindowLevelKey)
-  msgSendSetLevel(nsWindow, selSetLevel, BigInt(desktopIconLevel) + 1n)
+    const desktopIconLevel = CGWindowLevelForKey(kCGDesktopIconWindowLevelKey)
+    const targetLevel = BigInt(desktopIconLevel) + 1n
+    console.log('[nswindow] setting level', targetLevel, 'on nsWindow', nsWindow)
+    msgSendSetLevel(nsWindow, selSetLevel, targetLevel)
+  } catch (err) {
+    console.log('[nswindow] pinAboveDesktopIcons threw:', err)
+  }
 }
