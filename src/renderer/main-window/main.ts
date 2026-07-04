@@ -5,7 +5,7 @@ export {}
 interface NotesWidgetApi {
   auth: {
     signIn: (email: string, password: string) => Promise<void>
-    signUp: (email: string, password: string) => Promise<void>
+    signUp: (email: string, password: string, username: string) => Promise<void>
     signInGoogle: () => Promise<void>
     signOut: () => Promise<void>
     onChanged: (callback: (state: AuthState) => void) => void
@@ -29,9 +29,11 @@ const notesView = document.getElementById('notes-view') as HTMLElement
 const loginForm = document.getElementById('login-form') as HTMLFormElement
 const emailInput = document.getElementById('email') as HTMLInputElement
 const passwordInput = document.getElementById('password') as HTMLInputElement
+const usernameInput = document.getElementById('username') as HTMLInputElement
 const signupBtn = document.getElementById('signup-btn') as HTMLButtonElement
 const googleBtn = document.getElementById('google-btn') as HTMLButtonElement
 const authError = document.getElementById('auth-error') as HTMLElement
+const userNameEl = document.getElementById('user-name') as HTMLElement
 const userEmailEl = document.getElementById('user-email') as HTMLElement
 const signoutBtn = document.getElementById('signout-btn') as HTMLButtonElement
 const addNoteForm = document.getElementById('add-note-form') as HTMLFormElement
@@ -52,7 +54,12 @@ loginForm.addEventListener('submit', (event) => {
 
 signupBtn.addEventListener('click', () => {
   authError.textContent = ''
-  window.notesWidget.auth.signUp(emailInput.value, passwordInput.value).catch(showError)
+  const username = usernameInput.value.trim()
+  if (!username) {
+    authError.textContent = 'Kayit icin kullanici adi gerekli'
+    return
+  }
+  window.notesWidget.auth.signUp(emailInput.value, passwordInput.value, username).catch(showError)
 })
 
 googleBtn.addEventListener('click', () => {
@@ -138,7 +145,8 @@ window.notesWidget.auth.onChanged((state) => {
   if (state.status === 'signedIn') {
     loginView.hidden = true
     notesView.hidden = false
-    userEmailEl.textContent = state.user.email ?? state.user.displayName ?? state.user.uid
+    userNameEl.textContent = state.user.displayName ?? state.user.email ?? state.user.uid
+    userEmailEl.textContent = state.user.email ?? ''
   } else {
     loginView.hidden = false
     notesView.hidden = true

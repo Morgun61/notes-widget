@@ -6,7 +6,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signOut
+  signOut,
+  updateProfile
 } from 'firebase/auth'
 import {
   addDoc,
@@ -117,8 +118,27 @@ window.dataBridge.onCommand(async (channel, payload) => {
       return null
     }
     case CommandChannels.authSignUp: {
-      const { email, password } = payload as { email: string; password: string }
-      await createUserWithEmailAndPassword(auth, email, password)
+      const { email, password, username } = payload as {
+        email: string
+        password: string
+        username: string
+      }
+      const credential = await createUserWithEmailAndPassword(auth, email, password)
+      await updateProfile(credential.user, { displayName: username })
+      // onAuthStateChanged already fired (and emitted authChanged) the
+      // instant the account was created, before the display name above was
+      // set - it doesn't fire again just because the profile changed. Emit
+      // once more now so the UI actually gets the username instead of
+      // showing blank/email until the next full auth transition.
+      const state: AuthState = {
+        status: 'signedIn',
+        user: {
+          uid: credential.user.uid,
+          email: credential.user.email,
+          displayName: credential.user.displayName
+        }
+      }
+      window.dataBridge.emit(DataEventChannels.authChanged, state)
       return null
     }
     case CommandChannels.authSignInGoogle: {

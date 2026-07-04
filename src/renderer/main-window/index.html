@@ -18,6 +18,12 @@
             autocomplete="current-password"
             required
           />
+          <input
+            id="username"
+            type="text"
+            placeholder="Kullanici Adi (kayit icin)"
+            autocomplete="nickname"
+          />
           <div class="row">
             <button id="signin-btn" type="submit">Giris Yap</button>
             <button id="signup-btn" type="button">Kayit Ol</button>
@@ -28,6 +34,7 @@
       </section>
 
       <section id="notes-view" hidden>
+        <h1 id="user-name" class="user-name"></h1>
         <header>
           <span id="user-email"></span>
           <button id="signout-btn">Cikis Yap</button>

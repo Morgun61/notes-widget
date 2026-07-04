@@ -23,8 +23,8 @@ const api = {
   auth: {
     signIn: (email: string, password: string): Promise<void> =>
       ipcRenderer.invoke(CommandChannels.authSignIn, { email, password }),
-    signUp: (email: string, password: string): Promise<void> =>
-      ipcRenderer.invoke(CommandChannels.authSignUp, { email, password }),
+    signUp: (email: string, password: string, username: string): Promise<void> =>
+      ipcRenderer.invoke(CommandChannels.authSignUp, { email, password, username }),
     signInGoogle: (): Promise<void> => ipcRenderer.invoke(CommandChannels.authSignInGoogle),
     signOut: (): Promise<void> => ipcRenderer.invoke(CommandChannels.authSignOut),
     onChanged: (callback: (state: AuthState) => void): void => {
