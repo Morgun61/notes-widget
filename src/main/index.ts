@@ -6,7 +6,7 @@ import { startRendererServer } from './localServer'
 import { createTray } from './tray'
 import { createDataWindow } from './windows/dataWindow'
 import { createMainWindow, getMainWindow } from './windows/mainWindow'
-import { createOverlayWindow } from './windows/overlayWindow'
+import { createOverlayWindow, getOverlayWindow } from './windows/overlayWindow'
 
 if (process.platform === 'win32') {
   // The overlay is reparented into Progman/WorkerW (see native/workerw.ts).
@@ -62,5 +62,19 @@ if (!gotSingleInstanceLock) {
 
   app.on('before-quit', () => {
     appState.isQuitting = true
+
+    // The overlay is forcibly reparented into Explorer's WorkerW (see
+    // overlayWindow.ts) - a real Win32 window-tree relationship that
+    // belongs to a process other than ours. Letting the OS tear it down
+    // as a side effect of our whole process dying at once - rather than
+    // closing it ourselves first while we're still alive to handle the
+    // resulting messages - can leave Explorer without a repaint signal
+    // for that screen region, so the last frame stays stuck on the
+    // desktop after the app has fully quit.
+    const overlay = getOverlayWindow()
+    if (overlay && !overlay.isDestroyed()) {
+      overlay.hide()
+      overlay.destroy()
+    }
   })
 }
