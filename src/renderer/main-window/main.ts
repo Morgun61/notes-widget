@@ -220,6 +220,7 @@ function renderList(notes: Note[], reorderable: boolean): void {
     const textSpan = document.createElement('span')
     textSpan.className = 'text'
     textSpan.textContent = note.text
+    textSpan.style.color = note.color || ''
     textSpan.addEventListener('click', () => {
       const input = document.createElement('input')
       input.type = 'text'
@@ -242,7 +243,11 @@ function renderList(notes: Note[], reorderable: boolean): void {
     colorBtn.type = 'button'
     colorBtn.className = 'color-swatch'
     colorBtn.title = 'Renk sec'
-    colorBtn.style.background = note.color || 'transparent'
+    // Leave background unset (falls back to the checkered "no color" CSS
+    // pattern) rather than 'transparent' - a plain transparent circle on
+    // this dark background was practically invisible, which is why the
+    // button went unnoticed.
+    if (note.color) colorBtn.style.background = note.color
     colorBtn.addEventListener('click', (e) => {
       e.stopPropagation()
       openColorPopover(colorBtn, note)

@@ -144,14 +144,22 @@ header {
   cursor: default;
 }
 
-.color-swatch {
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
+/* #notes-list li button (below) sets a plain background on every note
+   button and, as an ID-qualified selector, outranks a bare .color-swatch
+   class rule - qualify this one the same way so it isn't silently
+   overridden back to a flat background. */
+#notes-list li button.color-swatch {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid #555;
-  background: transparent;
+  border: 2px solid #888;
+  background: repeating-linear-gradient(45deg, #555, #555 3px, #2a2a3a 3px, #2a2a3a 6px);
+}
+
+#notes-list li button.color-swatch:hover {
+  border-color: #ccc;
 }
 
 .color-popover {

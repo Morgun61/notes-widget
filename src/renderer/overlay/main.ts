@@ -71,7 +71,10 @@ function render(notes: Note[]): void {
       pin.textContent = '★'
       li.append(pin)
     }
-    li.append(document.createTextNode(note.text))
+    const textSpan = document.createElement('span')
+    textSpan.textContent = note.text
+    textSpan.style.color = note.color || ''
+    li.append(textSpan)
     listEl.append(li)
   }
 
