@@ -69,9 +69,19 @@ export function registerIpcHandlers(): void {
   // still let "Sign in with Google" silently reuse the old session on some
   // platforms. A full session wipe is the only reliable fix - nothing else
   // in the app depends on Chromium-session-level storage surviving sign-out.
+  //
+  // Clearing storage alone isn't enough either: the data window's Firebase
+  // SDK instance and the main/overlay windows' in-memory note list keep
+  // running with whatever they already loaded, so the previous account's
+  // notes stay on screen (a real privacy leak on a shared machine) until
+  // something forces them to re-read state from scratch. Reloading all
+  // three windows after the wipe is what actually forces that.
   ipcMain.handle(CommandChannels.authSignOut, async (_event, payload) => {
     const result = await relayToDataWindow(CommandChannels.authSignOut, payload)
     await session.defaultSession.clearStorageData()
+    getDataWindow()?.webContents.reload()
+    getMainWindow()?.webContents.reload()
+    getOverlayWindow()?.webContents.reload()
     return result
   })
 
