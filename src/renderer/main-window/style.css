@@ -206,6 +206,11 @@ header {
   color: #1e1e2e;
 }
 
+#notes-list li button.confirm-delete {
+  background: #ff6b6b;
+  color: #1e1e2e;
+}
+
 #notes-list li input[type='checkbox'] {
   display: inline-block;
   width: auto;

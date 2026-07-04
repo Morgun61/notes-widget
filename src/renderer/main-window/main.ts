@@ -264,7 +264,21 @@ function renderList(notes: Note[], reorderable: boolean): void {
     const deleteBtn = document.createElement('button')
     deleteBtn.textContent = 'Sil'
     deleteBtn.type = 'button'
+    let confirmTimer: ReturnType<typeof setTimeout> | null = null
     deleteBtn.addEventListener('click', () => {
+      if (!deleteBtn.classList.contains('confirm-delete')) {
+        deleteBtn.classList.add('confirm-delete')
+        deleteBtn.textContent = 'Emin misin?'
+        // Arms for 3s, then falls back to the normal "Sil" state on its
+        // own - a stray click days later shouldn't still delete on the
+        // next click with no fresh warning shown.
+        confirmTimer = setTimeout(() => {
+          deleteBtn.classList.remove('confirm-delete')
+          deleteBtn.textContent = 'Sil'
+        }, 3000)
+        return
+      }
+      if (confirmTimer) clearTimeout(confirmTimer)
       window.notesWidget.notes.delete(note.id).catch(showError)
     })
 
