@@ -122,7 +122,9 @@ window.dataBridge.onCommand(async (channel, payload) => {
       return null
     }
     case CommandChannels.authSignInGoogle: {
-      await signInWithPopup(auth, new GoogleAuthProvider())
+      const provider = new GoogleAuthProvider()
+      provider.setCustomParameters({ prompt: 'select_account' })
+      await signInWithPopup(auth, provider)
       return null
     }
     case CommandChannels.authSignOut: {
